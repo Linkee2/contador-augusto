@@ -123,99 +123,97 @@
 
 <button onclick="resetCounter()">Pablo habló de Augusto 😤</button>
 <small id="lastReset"></small>
-<script>
-  const STORAGE_KEY = "ultimaVezAugusto";
-  const RECORD_KEY = "recordAugustoMs";
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+  import {
+    getDatabase,
+    ref,
+    onValue,
+    runTransaction
+  } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
-  function pad2(n) {
+  // 👇 AQUÍ ES DONDE VA firebaseConfig
+const firebaseConfig = {
+  apiKey: "AIzaSyAQIYVKnHnbBXK7q8rW0Lwr56wAhm5wjxE",
+  authDomain: "contador-augusto.firebaseapp.com",
+  databaseURL: "https://contador-augusto-default-rtdb.firebaseio.com",
+  projectId: "contador-augusto",
+  storageBucket: "contador-augusto.firebasestorage.app",
+  messagingSenderId: "336307347194",
+  appId: "1:336307347194:web:f6e141738a8ddc7ce5f343"
+};
+
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
+
+  const counterRef = ref(db, "augustoCounter");
+
+  function pad(n) {
     return String(n).padStart(2, "0");
   }
 
-  function formatMs(ms) {
-    const totalSeconds = Math.floor(ms / 1000);
-    const days = Math.floor(totalSeconds / 86400);
-    const hours = Math.floor((totalSeconds % 86400) / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${days}d ${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
-  }
-
-  function getDiffParts(fromDate) {
-    const now = new Date();
-    let diffMs = now - fromDate;
-    if (diffMs < 0) diffMs = 0;
-
+  function paint(diffMs, recordMs, lastResetMs) {
     const totalSeconds = Math.floor(diffMs / 1000);
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
 
-    return { diffMs, days, hours, minutes, seconds };
-  }
-
-  function getOrInitLastDate() {
-    let last = localStorage.getItem(STORAGE_KEY);
-    if (!last) {
-      const now = new Date();
-      localStorage.setItem(STORAGE_KEY, now.toISOString());
-      return now;
-    }
-    return new Date(last);
-  }
-
-  function getRecordMs() {
-    const v = localStorage.getItem(RECORD_KEY);
-    return v ? Number(v) : 0;
-  }
-
-  function setRecordMs(ms) {
-    localStorage.setItem(RECORD_KEY, String(ms));
-  }
-
-  function updateUI() {
-    const lastDate = getOrInitLastDate();
-    const { diffMs, days, hours, minutes, seconds } = getDiffParts(lastDate);
-
-    // Pintar cajitas
     document.getElementById("dd").innerText = days;
-    document.getElementById("hh").innerText = pad2(hours);
-    document.getElementById("mm").innerText = pad2(minutes);
-    document.getElementById("ss").innerText = pad2(seconds);
+    document.getElementById("hh").innerText = pad(hours);
+    document.getElementById("mm").innerText = pad(minutes);
+    document.getElementById("ss").innerText = pad(seconds);
 
-    // Actualizar récord si aplica
-    const recordMs = getRecordMs();
-    if (diffMs > recordMs) {
-      setRecordMs(diffMs);
-    }
+    document.getElementById("record").innerText =
+      `${Math.floor(recordMs / 86400000)}d ${pad(Math.floor(recordMs / 3600000) % 24)}:${pad(Math.floor(recordMs / 60000) % 60)}:${pad(Math.floor(recordMs / 1000) % 60)}`;
 
-    // Mostrar récord
-    document.getElementById("record").innerText = formatMs(getRecordMs());
-
-    // Texto de última mención
     document.getElementById("lastReset").innerText =
-      "Última mención: " + lastDate.toLocaleString();
+      "Última mención (global): " + new Date(lastResetMs).toLocaleString();
   }
 
-  function resetCounter() {
-    const now = new Date();
+  let lastResetMs = Date.now();
+  let recordMs = 0;
 
-    // Antes de resetear, por si justo iba a romper récord:
-    const lastDate = getOrInitLastDate();
-    const { diffMs } = getDiffParts(lastDate);
-    const recordMs = getRecordMs();
-    if (diffMs > recordMs) setRecordMs(diffMs);
+  setInterval(() => {
+    paint(Date.now() - lastResetMs, recordMs, lastResetMs);
+  }, 1000);
 
-    localStorage.setItem(STORAGE_KEY, now.toISOString());
-    updateUI();
+  async function boot() {
+    await signInAnonymously(auth);
+
+    onValue(counterRef, (snap) => {
+      const data = snap.val();
+      if (!data) return;
+
+      lastResetMs = data.lastResetMs;
+      recordMs = data.recordMs || 0;
+    });
   }
 
-  // Para que el botón onclick lo encuentre
+  async function resetCounter() {
+    await runTransaction(counterRef, (current) => {
+      const now = Date.now();
+
+      if (!current) {
+        return { lastResetMs: now, recordMs: 0 };
+      }
+
+      const diff = now - current.lastResetMs;
+      return {
+        lastResetMs: now,
+        recordMs: Math.max(current.recordMs || 0, diff)
+      };
+    });
+  }
+
   window.resetCounter = resetCounter;
-
-  updateUI();
-  setInterval(updateUI, 1000);
+  boot();
 </script>
+
 
 
 
