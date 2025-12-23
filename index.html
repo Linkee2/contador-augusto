@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Días sin hablar de Augusto</title>
+ <style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: #fff;
+    text-align: center;
+    padding: 60px 16px;
+  }
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 25px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 160px));
+    gap: 14px;
+    justify-content: center;
+    margin-bottom: 22px;
+  }
+
+  .box {
+    background: #1b1b1b;
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    padding: 18px 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+
+  .num {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #00ffcc;
+    line-height: 1.1;
+  }
+
+  .label {
+    margin-top: 8px;
+    font-size: 0.9rem;
+    letter-spacing: 0.12em;
+    color: #bdbdbd;
+  }
+
+  .record {
+    display: inline-block;
+    margin-bottom: 18px;
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: #141414;
+    border: 1px solid #2a2a2a;
+  }
+
+  .record-title {
+    font-size: 0.85rem;
+    letter-spacing: 0.14em;
+    color: #bdbdbd;
+    margin-bottom: 6px;
+  }
+
+  .record-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+  }
+
+  button {
+    font-size: 1.1rem;
+    padding: 14px 22px;
+    background: #ff4444;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  button:hover { background: #ff0000; }
+
+  small {
+    display: block;
+    margin-top: 18px;
+    color: #aaa;
+  }
+
+  /* Responsive para celular */
+  @media (max-width: 620px) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(140px, 1fr));
+    }
+  }
+</style>
+
+
+
+</head>
+<body><h1>Días desde que Pablo habló de Augusto</h1>
+
+<div class="grid">
+  <div class="box">
+    <div class="num" id="dd">0</div>
+    <div class="label">DÍAS</div>
+  </div>
+  <div class="box">
+    <div class="num" id="hh">00</div>
+    <div class="label">HORAS</div>
+  </div>
+  <div class="box">
+    <div class="num" id="mm">00</div>
+    <div class="label">MIN</div>
+  </div>
+  <div class="box">
+    <div class="num" id="ss">00</div>
+    <div class="label">SEG</div>
+  </div>
+</div>
+
+<div class="record">
+  <div class="record-title">RÉCORD</div>
+  <div class="record-value" id="record">0d 00:00:00</div>
+</div>
+
+<button onclick="resetCounter()">Pablo habló de Augusto 😤</button>
+<small id="lastReset"></small>
+<script>
+  const STORAGE_KEY = "ultimaVezAugusto";
+  const RECORD_KEY = "recordAugustoMs";
+
+  function pad2(n) {
+    return String(n).padStart(2, "0");
+  }
+
+  function formatMs(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${days}d ${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+  }
+
+  function getDiffParts(fromDate) {
+    const now = new Date();
+    let diffMs = now - fromDate;
+    if (diffMs < 0) diffMs = 0;
+
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return { diffMs, days, hours, minutes, seconds };
+  }
+
+  function getOrInitLastDate() {
+    let last = localStorage.getItem(STORAGE_KEY);
+    if (!last) {
+      const now = new Date();
+      localStorage.setItem(STORAGE_KEY, now.toISOString());
+      return now;
+    }
+    return new Date(last);
+  }
+
+  function getRecordMs() {
+    const v = localStorage.getItem(RECORD_KEY);
+    return v ? Number(v) : 0;
+  }
+
+  function setRecordMs(ms) {
+    localStorage.setItem(RECORD_KEY, String(ms));
+  }
+
+  function updateUI() {
+    const lastDate = getOrInitLastDate();
+    const { diffMs, days, hours, minutes, seconds } = getDiffParts(lastDate);
+
+    // Pintar cajitas
+    document.getElementById("dd").innerText = days;
+    document.getElementById("hh").innerText = pad2(hours);
+    document.getElementById("mm").innerText = pad2(minutes);
+    document.getElementById("ss").innerText = pad2(seconds);
+
+    // Actualizar récord si aplica
+    const recordMs = getRecordMs();
+    if (diffMs > recordMs) {
+      setRecordMs(diffMs);
+    }
+
+    // Mostrar récord
+    document.getElementById("record").innerText = formatMs(getRecordMs());
+
+    // Texto de última mención
+    document.getElementById("lastReset").innerText =
+      "Última mención: " + lastDate.toLocaleString();
+  }
+
+  function resetCounter() {
+    const now = new Date();
+
+    // Antes de resetear, por si justo iba a romper récord:
+    const lastDate = getOrInitLastDate();
+    const { diffMs } = getDiffParts(lastDate);
+    const recordMs = getRecordMs();
+    if (diffMs > recordMs) setRecordMs(diffMs);
+
+    localStorage.setItem(STORAGE_KEY, now.toISOString());
+    updateUI();
+  }
+
+  // Para que el botón onclick lo encuentre
+  window.resetCounter = resetCounter;
+
+  updateUI();
+  setInterval(updateUI, 1000);
+</script>
+
+
+
+
+</body>
+</html>
